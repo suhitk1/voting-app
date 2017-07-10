@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <% include ../partials/header.ejs %>
+        <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+        <script async src="//platform.twitter.com/widgets.js" charset="utf-8"></script>
+</head>
+
+<body>
+    <% include ../partials/nav.ejs %>
+        <br>
+        <!-- Begin Container -->
+        <div class="container" id="pollData">
+            <h2 id="qid"></h2>
+            <p id="qid2">No votes for this poll yet.</p>
+            <div class="row">
+                <div class="col-sm-4">
+                    <div class="form-group">
+                        <label for="sel1">Vote:</label>
+                        <select class="form-control" id="sel1">
+								<option>Choose an answer</option>
+							</select>
+                    </div>
+                    <div id="newans2" style="display: none;">Enter new answer:<input type="text" id="newans"></div><br>
+                    <div id="voteLink" style="display: none;"><a href="#" class="btn btn-info" onclick="voted();">Vote</a></div><br>
+                    <div id="delLink" style="display: none;"></div><br>
+                    <a href="https://twitter.com/share" class="twitter-share-button" data-size="large" data-text="Check out this poll here:" data-show-count="false">Tweet</a>
+                </div>
+                <div class="col-sm-8">
+                    <div id="piechart" style="width: 600px; height: 500px;"></div>
+                </div>
+            </div>
+        </div>
+        <!-- /.container -->
+        <script>
+        var myVar = <%- JSON.stringify(user) %>;
+        var datapoints;
+            $('#newans2').hide();
+            $('#qid2').hide();
+            $('#voteLink').hide();
+             $('#delLink').hide();
+            var pollID = getQueryVariable("id");
+            $.ajax({
+                type: 'GET',
+                url: '/getSinglePoll?id=' + pollID,
+                success: function(dataP) {
+                    //console.log(dataP);
+                    datapoints = dataP;
+                    if(dataP.poll.user === myVar) {
+                      $('#delLink').html('<a href="/deletePoll?id='+dataP.poll._id+'" class="btn btn-danger">Delete</a>');
+                      $('#delLink').show();
+                    }
+                    var tempAnswers = [
+                        ['Answer', 'Votes']
+                    ];
+                    var options2 = [];
+                    var noData = true;
+                    for (var i = 0; i < dataP.poll.answers.length; i++) {
+                        tempAnswers.push([dataP.poll.answers[i].answer, dataP.poll.answers[i].total]);
+                        if (dataP.poll.answers[i].total > 0) {
+                            noData = false;
+                        }
+                        options2.push(dataP.poll.answers[i].answer);
+                    }
+                    if(myVar != null){
+                        options2.push("new option");
+                    }
+                    google.charts.load('current', {
+                        'packages': ['corechart']
+                    });
+                    google.charts.setOnLoadCallback(drawChart);
+
+                    function drawChart() {
+
+                        var data = google.visualization.arrayToDataTable(tempAnswers);
+
+                        var options = {
+                            title: dataP.poll.question,
+                             pieSliceText: 'value-and-percentage'
+                        };
+
+                        var chart = new google.visualization.PieChart(document.getElementById('piechart'));
+
+                        chart.draw(data, options);
+                        if (noData) {
+                            $('#piechart').hide();
+                            $('#qid').html(dataP.poll.question);
+                            $('#qid2').show();
+
+                        }
+
+                        var select = document.getElementById("sel1");
+                        for (var i = 0; i < options2.length; i++) {
+                            var opt = options2[i];
+                            var el = document.createElement("option");
+                            el.textContent = opt;
+                            el.value = opt;
+                            select.appendChild(el);
+                        }
+                    }
+                }
+            });
+
+            function getQueryVariable(variable) {
+                var query = window.location.search.substring(1);
+                var vars = query.split("&");
+                for (var i = 0; i <
+                    vars.length; i++) {
+                    var pair = vars[i].split("=");
+                    if (pair[0] == variable) {
+                        return pair[1];
+                    }
+                }
+                return (false);
+            }
+            
+            $( "#sel1" ).change(function() {
+                var tempVal = this.value;
+                if(tempVal === "Choose an answer"){
+                  $('#voteLink').hide();
+                }
+                else {
+                    $('#voteLink').show();
+                }
+                if(tempVal === "new option"){
+                    $('#newans2').show();
+                }
+                else{
+                    $('#newans2').hide();
+                }
+            });
+            function voted() {
+                if($( "#sel1" ).val() === "new option"){
+                    datapoints.poll.answers.push({"answer":$( "#newans" ).val(),"total":1});
+                    $.ajax({
+                        type: 'POST',
+                        url: '/updatePoll',
+                        contentType: 'application/json',
+                        data: JSON.stringify(datapoints),
+                        success: function(data) {
+                            //console.log(data);
+                            location.reload();
+                        }
+                    });
+                }
+                else {
+                    for(var i = 0; i < datapoints.poll.answers.length; i++){
+                        if(datapoints.poll.answers[i].answer === $( "#sel1" ).val()){
+                            datapoints.poll.answers[i].total++;
+                        }
+                    }
+                    $.ajax({
+                        type: 'POST',
+                        url: '/updatePoll',
+                        contentType: 'application/json',
+                        data: JSON.stringify(datapoints),
+                        success: function(data) {
+                            //console.log(data);
+                            location.reload();
+                        }
+                    });
+                }
+            }
+        </script>
+</body>
+
+</html>
